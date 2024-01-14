@@ -21,7 +21,6 @@ import (
 
 	k8smetrics "k8s.io/component-base/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
 // frameworkMetric is the data structure passed in the buffer channel between the main framework thread
@@ -57,14 +56,14 @@ func newMetricsRecorder(bufferSize int, interval time.Duration) *metricsRecorder
 		stopCh:      make(chan struct{}),
 		isStoppedCh: make(chan struct{}),
 	}
-	go recorder.run()
+	// go recorder.run()
 	return recorder
 }
 
 // observePluginDurationAsync observes the plugin_execution_duration_seconds metric.
 // The metric will be flushed to Prometheus asynchronously.
 func (r *metricsRecorder) observePluginDurationAsync(extensionPoint, pluginName string, status *framework.Status, value float64) {
-	newMetric := &frameworkMetric{
+	/*newMetric := &frameworkMetric{
 		metric:      metrics.PluginExecutionDuration,
 		labelValues: []string{pluginName, extensionPoint, status.Code().String()},
 		value:       value,
@@ -72,7 +71,7 @@ func (r *metricsRecorder) observePluginDurationAsync(extensionPoint, pluginName 
 	select {
 	case r.bufferCh <- newMetric:
 	default:
-	}
+	}*/
 }
 
 // run flushes buffered metrics into Prometheus every second.
