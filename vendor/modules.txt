@@ -1379,7 +1379,7 @@ gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.1 => gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
-# k8s.io/api v0.0.0 => ./staging/src/k8s.io/api
+# k8s.io/api v0.20.15 => ./staging/src/k8s.io/api
 ## explicit; go 1.19
 k8s.io/api/admission/v1
 k8s.io/api/admission/v1beta1
@@ -1477,7 +1477,7 @@ k8s.io/apiextensions-apiserver/pkg/registry/customresourcedefinition
 k8s.io/apiextensions-apiserver/test/integration
 k8s.io/apiextensions-apiserver/test/integration/fixtures
 k8s.io/apiextensions-apiserver/third_party/forked/celopenapi/model
-# k8s.io/apimachinery v0.0.0 => ./staging/src/k8s.io/apimachinery
+# k8s.io/apimachinery v0.20.15 => ./staging/src/k8s.io/apimachinery
 ## explicit; go 1.19
 k8s.io/apimachinery/pkg/api/apitesting
 k8s.io/apimachinery/pkg/api/apitesting/fuzzer
@@ -1517,6 +1517,7 @@ k8s.io/apimachinery/pkg/runtime/serializer/yaml
 k8s.io/apimachinery/pkg/selection
 k8s.io/apimachinery/pkg/types
 k8s.io/apimachinery/pkg/util/cache
+k8s.io/apimachinery/pkg/util/clock
 k8s.io/apimachinery/pkg/util/diff
 k8s.io/apimachinery/pkg/util/duration
 k8s.io/apimachinery/pkg/util/errors
@@ -1548,7 +1549,7 @@ k8s.io/apimachinery/pkg/watch
 k8s.io/apimachinery/third_party/forked/golang/json
 k8s.io/apimachinery/third_party/forked/golang/netutil
 k8s.io/apimachinery/third_party/forked/golang/reflect
-# k8s.io/apiserver v0.0.0 => ./staging/src/k8s.io/apiserver
+# k8s.io/apiserver v0.20.15 => ./staging/src/k8s.io/apiserver
 ## explicit; go 1.19
 k8s.io/apiserver/pkg/admission
 k8s.io/apiserver/pkg/admission/configuration
@@ -1705,7 +1706,7 @@ k8s.io/apiserver/plugin/pkg/authorizer/webhook
 k8s.io/cli-runtime/pkg/genericclioptions
 k8s.io/cli-runtime/pkg/printers
 k8s.io/cli-runtime/pkg/resource
-# k8s.io/client-go v0.0.0 => ./staging/src/k8s.io/client-go
+# k8s.io/client-go v0.20.15 => git.garena.com/shopee/sz-devops/kubernetes/ecp-irmas/client-go v0.0.0-20240114083006-8f949dd20e35
 ## explicit; go 1.19
 k8s.io/client-go/applyconfigurations
 k8s.io/client-go/applyconfigurations/admissionregistration/v1
@@ -1990,6 +1991,7 @@ k8s.io/client-go/testing
 k8s.io/client-go/third_party/forked/golang/template
 k8s.io/client-go/tools/auth
 k8s.io/client-go/tools/cache
+k8s.io/client-go/tools/cache/synctrack
 k8s.io/client-go/tools/clientcmd
 k8s.io/client-go/tools/clientcmd/api
 k8s.io/client-go/tools/clientcmd/api/latest
@@ -2050,14 +2052,14 @@ k8s.io/cluster-bootstrap/token/jws
 k8s.io/cluster-bootstrap/token/util
 k8s.io/cluster-bootstrap/util/secrets
 k8s.io/cluster-bootstrap/util/tokens
-# k8s.io/code-generator v0.0.0 => ./staging/src/k8s.io/code-generator
+# k8s.io/code-generator v0.20.15 => ./staging/src/k8s.io/code-generator
 ## explicit; go 1.19
 k8s.io/code-generator/cmd/go-to-protobuf
 k8s.io/code-generator/cmd/go-to-protobuf/protobuf
 k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo
 k8s.io/code-generator/pkg/util
 k8s.io/code-generator/third_party/forked/golang/reflect
-# k8s.io/component-base v0.0.0 => ./staging/src/k8s.io/component-base
+# k8s.io/component-base v0.20.15 => ./staging/src/k8s.io/component-base
 ## explicit; go 1.19
 k8s.io/component-base/cli
 k8s.io/component-base/cli/flag
@@ -2365,7 +2367,7 @@ k8s.io/legacy-cloud-providers/vsphere
 k8s.io/legacy-cloud-providers/vsphere/testing
 k8s.io/legacy-cloud-providers/vsphere/vclib
 k8s.io/legacy-cloud-providers/vsphere/vclib/diskmanagers
-# k8s.io/metrics v0.0.0 => ./staging/src/k8s.io/metrics
+# k8s.io/metrics v0.20.15 => ./staging/src/k8s.io/metrics
 ## explicit; go 1.19
 k8s.io/metrics/pkg/apis/custom_metrics
 k8s.io/metrics/pkg/apis/custom_metrics/v1beta1
@@ -2455,6 +2457,10 @@ k8s.io/utils/pointer
 k8s.io/utils/strings
 k8s.io/utils/strings/slices
 k8s.io/utils/trace
+# shopee.io/irmas-estimator v0.0.0-00010101000000-000000000000 => git.garena.com/shopee/sz-devops/kubernetes/ecp-irmas/irmas-estimator v0.0.0-20240110173400-9e773b06e740
+## explicit; go 1.15
+shopee.io/irmas-estimator/pkg/apis/irmas
+shopee.io/irmas-estimator/pkg/apis/irmas/v1beta1
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.37 => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.37
 ## explicit; go 1.17
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client
@@ -2874,7 +2880,7 @@ sigs.k8s.io/yaml
 # k8s.io/apimachinery => ./staging/src/k8s.io/apimachinery
 # k8s.io/apiserver => ./staging/src/k8s.io/apiserver
 # k8s.io/cli-runtime => ./staging/src/k8s.io/cli-runtime
-# k8s.io/client-go => ./staging/src/k8s.io/client-go
+# k8s.io/client-go => git.garena.com/shopee/sz-devops/kubernetes/ecp-irmas/client-go v0.0.0-20240114083006-8f949dd20e35
 # k8s.io/cloud-provider => ./staging/src/k8s.io/cloud-provider
 # k8s.io/cluster-bootstrap => ./staging/src/k8s.io/cluster-bootstrap
 # k8s.io/code-generator => ./staging/src/k8s.io/code-generator
@@ -2907,6 +2913,7 @@ sigs.k8s.io/yaml
 # modernc.org/strutil => modernc.org/strutil v1.0.0
 # modernc.org/xc => modernc.org/xc v1.0.0
 # rsc.io/pdf => rsc.io/pdf v0.1.1
+# shopee.io/irmas-estimator => git.garena.com/shopee/sz-devops/kubernetes/ecp-irmas/irmas-estimator v0.0.0-20240110173400-9e773b06e740
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.37
 # sigs.k8s.io/json => sigs.k8s.io/json v0.0.0-20211208200746-9f7c6b3444d2
 # sigs.k8s.io/kustomize/api => sigs.k8s.io/kustomize/api v0.11.4

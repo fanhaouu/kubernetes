@@ -99,6 +99,9 @@ type Scheduler struct {
 	percentageOfNodesToScore int32
 
 	nextStartNodeIndex int
+
+	// registeredHandlers contains the registrations of all handlers. It's used to check if all handlers have finished syncing before the scheduling cycles start.
+	registeredHandlers []cache.ResourceEventHandlerRegistration
 }
 
 type schedulerOptions struct {
@@ -328,7 +331,9 @@ func New(client clientset.Interface,
 		options.percentageOfNodesToScore,
 	)
 
-	addAllEventHandlers(sched, informerFactory, dynInformerFactory, unionedGVKs(clusterEventMap))
+	if err := addAllEventHandlers(sched, informerFactory, dynInformerFactory, unionedGVKs(clusterEventMap)); err != nil {
+		return nil, fmt.Errorf("adding event handlers: %w", err)
+	}
 
 	return sched, nil
 }

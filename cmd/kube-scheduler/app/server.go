@@ -186,18 +186,31 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 		}
 	}
 
-	// Start all informers.
-	cc.InformerFactory.Start(ctx.Done())
-	// DynInformerFactory can be nil in tests.
-	if cc.DynInformerFactory != nil {
-		cc.DynInformerFactory.Start(ctx.Done())
+	startInformersAndWaitForSync := func(ctx context.Context) {
+		// Start all informers.
+		cc.InformerFactory.Start(ctx.Done())
+		// DynInformerFactory can be nil in tests.
+		if cc.DynInformerFactory != nil {
+			cc.DynInformerFactory.Start(ctx.Done())
+		}
+
+		// Wait for all caches to sync before scheduling.
+		cc.InformerFactory.WaitForCacheSync(ctx.Done())
+		// DynInformerFactory can be nil in tests.
+		if cc.DynInformerFactory != nil {
+			cc.DynInformerFactory.WaitForCacheSync(ctx.Done())
+		}
+
+		// Wait for all handlers to sync (all items in the initial list delivered) before scheduling.
+		if err := sched.WaitForHandlersSync(ctx); err != nil {
+			klog.Error(err, "waiting for handlers to sync")
+		}
+
+		klog.V(3).Info("Handlers synced")
 	}
 
-	// Wait for all caches to sync before scheduling.
-	cc.InformerFactory.WaitForCacheSync(ctx.Done())
-	// DynInformerFactory can be nil in tests.
-	if cc.DynInformerFactory != nil {
-		cc.DynInformerFactory.WaitForCacheSync(ctx.Done())
+	if cc.LeaderElection == nil {
+		startInformersAndWaitForSync(ctx)
 	}
 
 	// If leader election is enabled, runCommand via LeaderElector until done and exit.
@@ -205,6 +218,9 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 		cc.LeaderElection.Callbacks = leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(ctx context.Context) {
 				close(waitingForLeader)
+				klog.Info("Starting informers and waiting for sync...")
+				startInformersAndWaitForSync(ctx)
+				klog.Info("Sync completed")
 				sched.Run(ctx)
 			},
 			OnStoppedLeading: func() {
