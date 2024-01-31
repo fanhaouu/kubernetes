@@ -479,7 +479,7 @@ func addAllEventHandlers(
 			handlers = append(handlers, handlerRegistration)
 		}
 	}
-
+	sched.registeredHandlers = handlers
 	return nil
 }
 
