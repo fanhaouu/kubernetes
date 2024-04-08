@@ -30,16 +30,21 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
+	v1helper "k8s.io/component-helpers/scheduling/corev1"
+	corev1nodeaffinity "k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
+
 	utiltrace "k8s.io/utils/trace"
 )
 
@@ -415,15 +420,113 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.F
 			nodes = append(nodes, nInfo)
 		}
 	}
+
+	var addNextStartNodeIndex = true
+	if preferredPlugin, ok := pod.Annotations["scheduler.ecp.shopee.io/preferred-plugin"]; ok && len(preferredPlugin) != 0 {
+		startTime := time.Now()
+		var checkPreferred func(node *v1.Node, pod *v1.Pod) bool
+		if preferredPlugin == nodeaffinity.Name {
+			checkPreferred = func(node *v1.Node, pod *v1.Pod) bool {
+				affinity := pod.Spec.Affinity
+				if affinity != nil && affinity.NodeAffinity != nil && affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+					terms, err := corev1nodeaffinity.NewPreferredSchedulingTerms(affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution)
+					if err != nil {
+						klog.ErrorS(err, "failed to parse pod's nodeaffinity", "pod", klog.KObj(pod))
+						return false
+					}
+					if terms != nil && terms.Score(node) > 0 {
+						return true
+					}
+				}
+				return false
+			}
+		} else if preferredPlugin == tainttoleration.Name {
+			checkPreferred = func(node *v1.Node, pod *v1.Pod) bool {
+				var filterTolerations []v1.Toleration
+				for _, toleration := range pod.Spec.Tolerations {
+					if toleration.Effect != v1.TaintEffectPreferNoSchedule {
+						continue
+					}
+					filterTolerations = append(filterTolerations, toleration)
+				}
+				if len(node.Spec.Taints) != 0 && len(filterTolerations) != 0 {
+					for _, taint := range node.Spec.Taints {
+						// check only on taints that have effect PreferNoSchedule
+						if taint.Effect != v1.TaintEffectPreferNoSchedule {
+							continue
+						}
+
+						if v1helper.TolerationsTolerateTaint(filterTolerations, &taint) {
+							return true
+						}
+					}
+				}
+				return false
+			}
+		}
+
+		var passChecked, noPassChecked []*framework.NodeInfo
+		if checkPreferred != nil {
+			for _, node := range nodes {
+				if checkPreferred(node.Node(), pod) {
+					passChecked = append(passChecked, node)
+					continue
+				}
+				noPassChecked = append(noPassChecked, node)
+			}
+		}
+
+		// ensure that each node has an opportunity to be selected
+		if len(passChecked) != 0 {
+			rand.Shuffle(len(passChecked), func(i, j int) {
+				passChecked[i], passChecked[j] = passChecked[j], passChecked[i]
+			})
+
+			rand.Shuffle(len(noPassChecked), func(i, j int) {
+				noPassChecked[i], noPassChecked[j] = noPassChecked[j], noPassChecked[i]
+			})
+
+			passChecked = append(passChecked, noPassChecked...)
+			nodes = passChecked
+
+			addNextStartNodeIndex = false
+		}
+		if checkPreferred != nil {
+			metrics.CheckPreferredPluginExecution.WithLabelValues(preferredPlugin).Observe(metrics.SinceInSeconds(startTime))
+		}
+	}
+
 	feasibleNodes, err := sched.findNodesThatPassFilters(ctx, fwk, state, pod, diagnosis, nodes)
+	// always try to update the sched.nextStartNodeIndex regardless of whether an error has occurred
+	// this is helpful to make sure that all the nodes have a chance to be searched
+	if addNextStartNodeIndex {
+		processedNodes := len(feasibleNodes) + len(diagnosis.NodeToStatusMap)
+		sched.nextStartNodeIndex = (sched.nextStartNodeIndex + processedNodes) % len(nodes)
+	}
 	if err != nil {
 		return nil, diagnosis, err
 	}
 
-	feasibleNodes, err = findNodesThatPassExtenders(sched.Extenders, pod, feasibleNodes, diagnosis.NodeToStatusMap)
+	feasibleNodesAfterExtender, err := findNodesThatPassExtenders(sched.Extenders, pod, feasibleNodes, diagnosis.NodeToStatusMap)
 	if err != nil {
 		return nil, diagnosis, err
 	}
+
+	if len(feasibleNodesAfterExtender) != len(feasibleNodes) {
+		// Extenders filtered out some nodes.
+		//
+		// Extender doesn't support any kind of requeueing feature like EnqueueExtensions in the scheduling framework.
+		// When Extenders reject some Nodes and the pod ends up being unschedulable,
+		// we put framework.ExtenderName to pInfo.UnschedulablePlugins.
+		// This Pod will be requeued from unschedulable pod pool to activeQ/backoffQ
+		// by any kind of cluster events.
+		// https://github.com/kubernetes/kubernetes/issues/122019
+		if diagnosis.UnschedulablePlugins == nil {
+			diagnosis.UnschedulablePlugins = sets.NewString()
+		}
+		diagnosis.UnschedulablePlugins.Insert(framework.ExtenderName)
+	}
+
 	return feasibleNodes, diagnosis, nil
 }
 
@@ -511,13 +614,11 @@ func (sched *Scheduler) findNodesThatPassFilters(
 	// Stops searching for more nodes once the configured number of feasible nodes
 	// are found.
 	fwk.Parallelizer().Until(ctx, len(nodes), checkNode)
-	processedNodes := int(feasibleNodesLen) + len(diagnosis.NodeToStatusMap)
-	sched.nextStartNodeIndex = (sched.nextStartNodeIndex + processedNodes) % len(nodes)
-
 	feasibleNodes = feasibleNodes[:feasibleNodesLen]
+
 	if err := errCh.ReceiveError(); err != nil {
 		statusCode = framework.Error
-		return nil, err
+		return feasibleNodes, err
 	}
 	return feasibleNodes, nil
 }

@@ -55,6 +55,9 @@ const (
 
 	// Use the general Update type if you don't either know or care the specific sub-Update type to use.
 	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition
+
+	// ExtenderName is a fake plugin name put in UnschedulablePlugins when Extender rejected some Nodes.
+	ExtenderName = "Extender"
 )
 
 // GVK is short for group/version/kind, which can uniquely represent a particular API resource.
