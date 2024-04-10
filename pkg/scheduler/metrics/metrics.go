@@ -135,6 +135,17 @@ var (
 		},
 		[]string{"extension_point", "status", "profile"})
 
+	CheckPreferredPluginExecution = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem: SchedulerSubsystem,
+			Name:      "check_preferred_plugin_execution_duration_seconds",
+			Help:      "Latency for checking preferred plugin.",
+			// Start with 0.1ms with the last bucket being [~200ms, Inf)
+			Buckets:        metrics.ExponentialBuckets(0.0001, 1.5, 20),
+			StabilityLevel: metrics.STABLE,
+		},
+		[]string{"plugin"})
+
 	PluginExecutionDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
@@ -192,6 +203,7 @@ var (
 		PodSchedulingDuration,
 		PodSchedulingAttempts,
 		FrameworkExtensionPointDuration,
+		CheckPreferredPluginExecution,
 		PluginExecutionDuration,
 		SchedulerQueueIncomingPods,
 		SchedulerGoroutines,
