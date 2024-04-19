@@ -465,32 +465,40 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.F
 		}
 
 		var passChecked, noPassChecked []*framework.NodeInfo
+		checkedNodes := make([]*framework.NodeInfo, len(nodes))
 		if checkPreferred != nil {
-			for _, node := range nodes {
-				if checkPreferred(node.Node(), pod) {
-					passChecked = append(passChecked, node)
-					continue
+			fwk.Parallelizer().Until(ctx, len(nodes), func(i int) {
+				if checkPreferred(nodes[i].Node(), pod) {
+					checkedNodes[i] = nodes[i]
+				} else {
+					checkedNodes[i] = nil
 				}
-				noPassChecked = append(noPassChecked, node)
+			})
+
+			for i, _ := range nodes {
+				if checkedNodes[i] == nil {
+					noPassChecked = append(noPassChecked, nodes[i])
+				} else {
+					passChecked = append(passChecked, nodes[i])
+				}
 			}
-		}
 
-		// ensure that each node has an opportunity to be selected
-		if len(passChecked) != 0 {
-			rand.Shuffle(len(passChecked), func(i, j int) {
-				passChecked[i], passChecked[j] = passChecked[j], passChecked[i]
-			})
+			// ensure that each node has an opportunity to be selected
+			if len(passChecked) != 0 {
+				rand.Shuffle(len(passChecked), func(i, j int) {
+					passChecked[i], passChecked[j] = passChecked[j], passChecked[i]
+				})
 
-			rand.Shuffle(len(noPassChecked), func(i, j int) {
-				noPassChecked[i], noPassChecked[j] = noPassChecked[j], noPassChecked[i]
-			})
+				rand.Shuffle(len(noPassChecked), func(i, j int) {
+					noPassChecked[i], noPassChecked[j] = noPassChecked[j], noPassChecked[i]
+				})
 
-			passChecked = append(passChecked, noPassChecked...)
-			nodes = passChecked
+				passChecked = append(passChecked, noPassChecked...)
+				nodes = passChecked
 
-			addNextStartNodeIndex = false
-		}
-		if checkPreferred != nil {
+				addNextStartNodeIndex = false
+			}
+
 			metrics.CheckPreferredPluginExecution.WithLabelValues(preferredPlugin).Observe(metrics.SinceInSeconds(startTime))
 		}
 	}
