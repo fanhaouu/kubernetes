@@ -19,6 +19,7 @@ package cache
 import (
 	"fmt"
 	"os"
+	"slices"
 	"sync"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
+
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
@@ -201,6 +203,9 @@ func (cache *cacheImpl) UpdateSnapshot(nodeSnapshot *Snapshot) error {
 	// Get the last generation of the snapshot.
 	snapshotGeneration := nodeSnapshot.generation
 
+	// DON'T re-create NodeInfoList when there is only one zone
+	singleZone := len(cache.nodeTree.zones) == 1
+
 	// NodeInfoList and HavePodsWithAffinityNodeInfoList must be re-created if a node was added
 	// or removed from the cache.
 	updateAllLists := false
@@ -223,9 +228,12 @@ func (cache *cacheImpl) UpdateSnapshot(nodeSnapshot *Snapshot) error {
 		if np := node.info.Node(); np != nil {
 			existing, ok := nodeSnapshot.nodeInfoMap[np.Name]
 			if !ok {
-				updateAllLists = true
+				updateAllLists = !singleZone
 				existing = &framework.NodeInfo{}
 				nodeSnapshot.nodeInfoMap[np.Name] = existing
+				if singleZone {
+					nodeSnapshot.nodeInfoList = append(nodeSnapshot.nodeInfoList, existing)
+				}
 			}
 			clone := node.info.Clone()
 			// We track nodes that have pods with affinity, here we check if this node changed its
@@ -242,6 +250,17 @@ func (cache *cacheImpl) UpdateSnapshot(nodeSnapshot *Snapshot) error {
 			*existing = *clone
 		}
 	}
+
+	slices.SortFunc(nodeSnapshot.nodeInfoList, func(a, b *framework.NodeInfo) int {
+		if a.AddedTime.Before(b.AddedTime) {
+			return -1
+		} else if a.AddedTime == b.AddedTime {
+			return 0
+		} else {
+			return 1
+		}
+	})
+
 	// Update the snapshot generation with the latest NodeInfo generation.
 	if cache.headNode != nil {
 		nodeSnapshot.generation = cache.headNode.info.Generation
@@ -251,8 +270,8 @@ func (cache *cacheImpl) UpdateSnapshot(nodeSnapshot *Snapshot) error {
 	// Deleted nodes get removed from the tree, but they might remain in the nodes map
 	// if they still have non-deleted Pods.
 	if len(nodeSnapshot.nodeInfoMap) > cache.nodeTree.numNodes {
-		cache.removeDeletedNodesFromSnapshot(nodeSnapshot)
-		updateAllLists = true
+		cache.removeDeletedNodesFromSnapshot(nodeSnapshot, singleZone)
+		updateAllLists = !singleZone
 	}
 
 	if updateAllLists || updateNodesHavePodsWithAffinity || updateNodesHavePodsWithRequiredAntiAffinity {
@@ -311,15 +330,28 @@ func (cache *cacheImpl) updateNodeInfoSnapshotList(snapshot *Snapshot, updateAll
 }
 
 // If certain nodes were deleted after the last snapshot was taken, we should remove them from the snapshot.
-func (cache *cacheImpl) removeDeletedNodesFromSnapshot(snapshot *Snapshot) {
+func (cache *cacheImpl) removeDeletedNodesFromSnapshot(snapshot *Snapshot, singleZone bool) {
 	toDelete := len(snapshot.nodeInfoMap) - cache.nodeTree.numNodes
 	for name := range snapshot.nodeInfoMap {
 		if toDelete <= 0 {
 			break
 		}
 		if n, ok := cache.nodes[name]; !ok || n.info.Node() == nil {
+			snapshot.nodeInfoMap[name].Generation = -1
 			delete(snapshot.nodeInfoMap, name)
 			toDelete--
+		}
+	}
+
+	if singleZone {
+		for i := 0; ; i++ {
+			if i >= len(snapshot.nodeInfoList) {
+				break
+			}
+
+			if snapshot.nodeInfoList[i].Generation == -1 {
+				snapshot.nodeInfoList = append(snapshot.nodeInfoList[:i], snapshot.nodeInfoList[i+1:]...)
+			}
 		}
 	}
 }
