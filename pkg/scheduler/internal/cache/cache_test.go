@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -39,9 +40,11 @@ func deepEqualWithoutGeneration(actual *nodeInfoListItem, expected *framework.No
 	// Ignore generation field.
 	if actual != nil {
 		actual.info.Generation = 0
+		actual.info.AddedTime = time.Time{}
 	}
 	if expected != nil {
 		expected.Generation = 0
+		expected.AddedTime = time.Time{}
 	}
 	if actual != nil && !reflect.DeepEqual(actual.info, expected) {
 		return fmt.Errorf("got node info %s, want %s", actual.info, expected)
@@ -1086,6 +1089,7 @@ func TestNodeOperators(t *testing.T) {
 
 			// Generations are globally unique. We check in our unit tests that they are incremented correctly.
 			expected.Generation = got.info.Generation
+			expected.AddedTime = got.info.AddedTime
 			if !reflect.DeepEqual(got.info, expected) {
 				t.Errorf("Failed to add node into scheduler cache:\n got: %+v \nexpected: %+v", got, expected)
 			}

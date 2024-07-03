@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+
 	"k8s.io/kubernetes/pkg/features"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -405,6 +406,9 @@ type NodeInfo struct {
 	// Whenever NodeInfo changes, generation is bumped.
 	// This is used to avoid cloning it if the object didn't change.
 	Generation int64
+
+	// The time watched the node
+	AddedTime time.Time
 }
 
 // nextGeneration: Let's make sure history never forgets the name...
@@ -528,6 +532,7 @@ func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
 		UsedPorts:        make(HostPortInfo),
 		ImageStates:      make(map[string]*ImageStateSummary),
 		PVCRefCounts:     make(map[string]int),
+		AddedTime:        time.Now(),
 	}
 	for _, pod := range pods {
 		ni.AddPod(pod)
@@ -554,6 +559,7 @@ func (n *NodeInfo) Clone() *NodeInfo {
 		ImageStates:      n.ImageStates,
 		PVCRefCounts:     n.PVCRefCounts,
 		Generation:       n.Generation,
+		AddedTime:        n.AddedTime,
 	}
 	if len(n.Pods) > 0 {
 		clone.Pods = append([]*PodInfo(nil), n.Pods...)
