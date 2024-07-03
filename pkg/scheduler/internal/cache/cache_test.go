@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -1762,6 +1763,7 @@ func setupCacheOf1kNodes30kPods(b *testing.B) Cache {
 	cache := newCache(time.Second, time.Second, nil)
 	for i := 0; i < 1000; i++ {
 		nodeName := fmt.Sprintf("node-%d", i)
+		cache.AddNode(st.MakeNode().Name(nodeName).Obj())
 		for j := 0; j < 30; j++ {
 			objName := fmt.Sprintf("%s-pod-%d", nodeName, j)
 			pod := makeBasePod(b, nodeName, objName, "0", "0", "", nil)
