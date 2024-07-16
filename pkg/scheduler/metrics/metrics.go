@@ -203,6 +203,7 @@ var (
 		PodSchedulingDuration,
 		PodSchedulingAttempts,
 		FrameworkExtensionPointDuration,
+		CheckPreferredPluginExecution,
 		PluginExecutionDuration,
 		SchedulerQueueIncomingPods,
 		SchedulerGoroutines,
