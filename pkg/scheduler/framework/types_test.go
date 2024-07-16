@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
@@ -341,6 +342,7 @@ func TestNewNodeInfo(t *testing.T) {
 
 	gen := generation
 	ni := NewNodeInfo(pods...)
+	ni.AddedTime = time.Time{}
 	if ni.Generation <= gen {
 		t.Errorf("Generation is not incremented. previous: %v, current: %v", gen, ni.Generation)
 	}
@@ -821,6 +823,7 @@ func TestNodeInfoAddPod(t *testing.T) {
 
 	ni := fakeNodeInfo()
 	gen := ni.Generation
+	ni.AddedTime = time.Time{}
 	for _, pod := range pods {
 		ni.AddPod(pod)
 		if ni.Generation <= gen {
@@ -1084,6 +1087,7 @@ func TestNodeInfoRemovePod(t *testing.T) {
 			ni := fakeNodeInfo(pods...)
 
 			gen := ni.Generation
+			ni.AddedTime = time.Time{}
 			err := ni.RemovePod(test.pod)
 			if err != nil {
 				if test.errExpected {
