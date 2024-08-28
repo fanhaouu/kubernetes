@@ -74,13 +74,9 @@ func (pa Parallelizer) Until(ctx context.Context, pieces int, doWorkPiece DoWork
 	if pieces == 0 {
 		return
 	}
-	chunkSize := chunkSizeFor(pieces, pa.parallelism)
-	if chunkSize < 1 {
-		chunkSize = 1
-	}
-	chunks := ceilDiv(pieces, chunkSize)
-	toProcess := make(chan int, chunks)
-	for i := 0; i < chunks; i++ {
+
+	toProcess := make(chan int, pieces)
+	for i := 0; i < pieces; i++ {
 		toProcess <- i
 	}
 	close(toProcess)
@@ -90,33 +86,21 @@ func (pa Parallelizer) Until(ctx context.Context, pieces int, doWorkPiece DoWork
 		stop = ctx.Done()
 	}
 
-	tasks := pa.parallelism
-	if chunks < tasks {
-		tasks = chunks
-	}
-
 	wg := sync.WaitGroup{}
-	wg.Add(tasks)
+	wg.Add(pa.parallelism)
 	taskProcess := func() {
 		defer utilruntime.HandleCrash()
 		defer wg.Done()
-		for chunk := range toProcess {
-			start := chunk * chunkSize
-			end := start + chunkSize
-			if end > pieces {
-				end = pieces
-			}
-			for p := start; p < end; p++ {
-				select {
-				case <-stop:
-					return
-				default:
-					doWorkPiece(p)
-				}
+		for i := range toProcess {
+			select {
+			case <-stop:
+				return
+			default:
+				doWorkPiece(i)
 			}
 		}
 	}
-	for i := 0; i < tasks; i++ {
+	for i := 0; i < pa.parallelism; i++ {
 		_ = pa.pool.Submit(taskProcess)
 	}
 	wg.Wait()
