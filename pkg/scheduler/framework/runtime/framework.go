@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -211,9 +212,9 @@ func WithExtenders(extenders []framework.Extender) Option {
 }
 
 // WithParallelism sets parallelism for the scheduling frameworkImpl.
-func WithParallelism(parallelism int) Option {
+func WithParallelism(stopCh <-chan struct{}, parallelism int) Option {
 	return func(o *frameworkOptions) {
-		o.parallelizer = parallelize.NewParallelizer(parallelism)
+		o.parallelizer = parallelize.NewParallelizer(stopCh, parallelism)
 	}
 }
 
@@ -231,7 +232,7 @@ func defaultFrameworkOptions() frameworkOptions {
 	return frameworkOptions{
 		metricsRecorder: newMetricsRecorder(1000, time.Second),
 		clusterEventMap: make(map[framework.ClusterEvent]sets.String),
-		parallelizer:    parallelize.NewParallelizer(parallelize.DefaultParallelism),
+		parallelizer:    parallelize.NewParallelizer(wait.NeverStop, parallelize.DefaultParallelism),
 	}
 }
 

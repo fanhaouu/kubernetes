@@ -287,7 +287,7 @@ func New(client clientset.Interface,
 		frameworkruntime.WithSnapshotSharedLister(snapshot),
 		frameworkruntime.WithCaptureProfile(frameworkruntime.CaptureProfile(options.frameworkCapturer)),
 		frameworkruntime.WithClusterEventMap(clusterEventMap),
-		frameworkruntime.WithParallelism(int(options.parallelism)),
+		frameworkruntime.WithParallelism(stopEverything, int(options.parallelism)),
 		frameworkruntime.WithExtenders(extenders),
 	)
 	if err != nil {

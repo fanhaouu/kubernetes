@@ -277,21 +277,21 @@ func TestDryRunPreemption(t *testing.T) {
 			for _, n := range tt.nodes {
 				objs = append(objs, n)
 			}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewSimpleClientset(objs...), 0)
 			parallelism := parallelize.DefaultParallelism
 			fwk, err := st.NewFramework(
 				registeredPlugins, "",
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithInformerFactory(informerFactory),
-				frameworkruntime.WithParallelism(parallelism),
+				frameworkruntime.WithParallelism(ctx.Done(), parallelism),
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.testPods, tt.nodes)),
 			)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
 			snapshot := internalcache.NewSnapshot(tt.initPods, tt.nodes)

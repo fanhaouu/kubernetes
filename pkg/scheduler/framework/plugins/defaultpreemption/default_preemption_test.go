@@ -1083,19 +1083,21 @@ func TestDryRunPreemption(t *testing.T) {
 				// or minCandidateNodesAbsolute. This is only done in a handful of tests.
 				parallelism = 1
 			}
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			fwk, err := st.NewFramework(
 				registeredPlugins, "",
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory),
-				frameworkruntime.WithParallelism(parallelism),
+				frameworkruntime.WithParallelism(ctx.Done(), parallelism),
 			)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
 
