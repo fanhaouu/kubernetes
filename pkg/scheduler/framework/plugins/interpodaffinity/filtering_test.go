@@ -19,13 +19,18 @@ package interpodaffinity
 import (
 	"context"
 	"fmt"
+	"net/http"
+	_ "net/http/pprof"
+	"os"
 	"reflect"
+	"runtime/trace"
 	"strings"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	plugintesting "k8s.io/kubernetes/pkg/scheduler/framework/plugins/testing"
@@ -54,7 +59,204 @@ func createPodWithAffinityTerms(namespace, nodeName string, labels map[string]st
 			},
 		},
 	}
+}
 
+func createNodesAndPods(count int, podPerNode int) ([]*v1.Pod, []*v1.Node) {
+	nodes := make([]*v1.Node, count)
+	pods := make([]*v1.Pod, count*podPerNode)
+
+	for i := 0; i < count; i++ {
+		name := fmt.Sprintf("node-%d", i)
+		nodes[i] = &v1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					"kubernetes.io/hostname": name,
+				},
+				Name: name,
+			},
+		}
+		for j := 0; j < podPerNode; j++ {
+			pods[i*podPerNode+j] = &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"a":                "a",
+						"bromo_service":    "service",
+						"b":                "b",
+						"bromo_deployment": "deployment",
+						"c":                "c",
+						"d":                "d",
+						"e":                "e",
+						"f":                "f",
+						"g":                "g",
+						"h":                "h",
+						"i":                "i",
+						"j":                "j",
+						"k":                "k",
+					},
+					Name:      fmt.Sprintf("exsiting-pod-%d", i*podPerNode+j),
+					Namespace: defaultNamespace,
+				},
+				Spec: v1.PodSpec{
+					NodeName: name,
+					//Affinity: &v1.Affinity{
+					//	PodAffinity: &v1.PodAffinity{
+					//		RequiredDuringSchedulingIgnoredDuringExecution: affinity,
+					//	},
+					//	PodAntiAffinity: &v1.PodAntiAffinity{
+					//		RequiredDuringSchedulingIgnoredDuringExecution: antiAffinity,
+					//	},
+					//},
+				},
+			}
+		}
+	}
+
+	return pods, nodes
+}
+
+func TestRequiredAntiAffinity(t *testing.T) {
+	go func() {
+		fmt.Println("Starting pprof server on :6060")
+		if err := http.ListenAndServe(":6060", nil); err != nil {
+			fmt.Println("pprof server failed: ", err)
+		}
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	count := 5000
+	scheduledPods := make([]*v1.Pod, 2*count)
+	for i := 0; i < count; i++ {
+		pod := createPodWithAffinityTerms(defaultNamespace, fmt.Sprintf("node-%d", i), map[string]string{
+			"a":                "a",
+			"bromo_service":    "service1",
+			"b":                "b",
+			"bromo_deployment": "deploy1",
+			"c":                "c",
+			"d":                "d",
+			"e":                "e",
+			"f":                "f",
+			"g":                "g",
+			"h":                "h",
+			"i":                "i",
+			"j":                "j",
+			"k":                "k",
+		}, nil, []v1.PodAffinityTerm{
+			v1.PodAffinityTerm{
+				LabelSelector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						metav1.LabelSelectorRequirement{
+							Key:      "bromo_deployment",
+							Operator: metav1.LabelSelectorOpIn,
+							Values:   []string{"deploy1"},
+						},
+						metav1.LabelSelectorRequirement{
+							Key:      "bromo_service",
+							Operator: metav1.LabelSelectorOpIn,
+							Values:   []string{"service1"},
+						},
+					},
+				},
+			},
+		})
+		pod.Name = fmt.Sprintf("scheduled-pod-%d", 2*i)
+		scheduledPods[2*i] = pod
+
+		pod = createPodWithAffinityTerms(defaultNamespace, fmt.Sprintf("node-%d", i), map[string]string{
+			"a":                "a",
+			"bromo_service":    "service2",
+			"b":                "b",
+			"bromo_deployment": "deploy2",
+			"c":                "c",
+			"d":                "d",
+			"e":                "e",
+			"f":                "f",
+			"g":                "g",
+			"h":                "h",
+			"i":                "i",
+			"j":                "j",
+			"k":                "k",
+		}, nil, []v1.PodAffinityTerm{
+			v1.PodAffinityTerm{
+				LabelSelector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						metav1.LabelSelectorRequirement{
+							Key:      "bromo_deployment",
+							Operator: metav1.LabelSelectorOpIn,
+							Values:   []string{"deploy2"},
+						},
+						metav1.LabelSelectorRequirement{
+							Key:      "bromo_service",
+							Operator: metav1.LabelSelectorOpIn,
+							Values:   []string{"service2"},
+						},
+					},
+				},
+			},
+		})
+		pod.Name = fmt.Sprintf("scheduled-pod-%d", 2*i+1)
+		scheduledPods[2*i+1] = pod
+	}
+
+	pods, nodes := createNodesAndPods(5000, 30)
+	snapshot := cache.NewSnapshot(append(pods, scheduledPods...), nodes)
+	p := plugintesting.SetupPluginWithInformers(ctx, t, New, &config.InterPodAffinityArgs{}, snapshot, namespaces)
+
+	pod := createPodWithAffinityTerms(defaultNamespace, "", map[string]string{
+		"a":                "a",
+		"bromo_service":    "service1",
+		"b":                "b",
+		"bromo_deployment": "deploy1",
+		"c":                "c",
+		"d":                "d",
+		"e":                "e",
+		"f":                "f",
+		"g":                "g",
+		"h":                "h",
+		"i":                "i",
+		"j":                "j",
+		"k":                "k",
+	}, nil, []v1.PodAffinityTerm{
+		v1.PodAffinityTerm{
+			LabelSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					metav1.LabelSelectorRequirement{
+						Key:      "bromo_deployment",
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{"deploy1"},
+					},
+					metav1.LabelSelectorRequirement{
+						Key:      "bromo_service",
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{"service1"},
+					},
+				},
+			},
+		},
+	})
+	pod.Name = "pod-to-schedule"
+
+	// 创建 trace 文件
+	f, err := os.Create("trace.out")
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+
+	// 启动 trace
+	if err := trace.Start(f); err != nil {
+		panic(err)
+	}
+	defer trace.Stop()
+
+	for i := 0; i < 1000; i++ {
+		state := framework.NewCycleState()
+		_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, state, pod)
+		if !preFilterStatus.IsSuccess() {
+			t.Fatalf(preFilterStatus.AsError().Error())
+		}
+	}
 }
 
 func TestRequiredAffinitySingleNode(t *testing.T) {

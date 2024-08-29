@@ -24,6 +24,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog/v2"
+	utiltrace "k8s.io/utils/trace"
+
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -228,6 +230,14 @@ func (pl *InterPodAffinity) getIncomingAffinityAntiAffinityCounts(ctx context.Co
 
 // PreFilter invoked at the prefilter extension point.
 func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+	tracer := utiltrace.New("kktest", []utiltrace.Field{
+		utiltrace.Field{
+			Key:   "pod",
+			Value: pod.Name,
+		},
+	}...)
+	defer tracer.Log()
+
 	var allNodes []*framework.NodeInfo
 	var nodesWithRequiredAntiAffinityPods []*framework.NodeInfo
 	var err error
@@ -237,10 +247,12 @@ func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState *framework
 	if nodesWithRequiredAntiAffinityPods, err = pl.sharedLister.NodeInfos().HavePodsWithRequiredAntiAffinityList(); err != nil {
 		return nil, framework.AsStatus(fmt.Errorf("failed to list NodeInfos with pods with affinity: %w", err))
 	}
+	tracer.Step("get related node done")
 
 	s := &preFilterState{}
 
 	s.podInfo = framework.NewPodInfo(pod)
+	tracer.Step("new pod info done")
 	if s.podInfo.ParseError != nil {
 		return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("parsing pod: %+v", s.podInfo.ParseError))
 	}
@@ -250,15 +262,20 @@ func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState *framework
 			return nil, framework.AsStatus(err)
 		}
 	}
+	tracer.Step("merge affinity terms done")
 	for i := range s.podInfo.RequiredAntiAffinityTerms {
 		if err := pl.mergeAffinityTermNamespacesIfNotEmpty(&s.podInfo.RequiredAntiAffinityTerms[i]); err != nil {
 			return nil, framework.AsStatus(err)
 		}
 	}
+	tracer.Step("merge antiaffinity terms done")
 	s.namespaceLabels = GetNamespaceLabelsSnapshot(pod.Namespace, pl.nsLister)
+	tracer.Step("get namespace labels snapshot done")
 
 	s.existingAntiAffinityCounts = pl.getExistingAntiAffinityCounts(ctx, pod, s.namespaceLabels, nodesWithRequiredAntiAffinityPods)
+	tracer.Step("get existing antiaffinity count done")
 	s.affinityCounts, s.antiAffinityCounts = pl.getIncomingAffinityAntiAffinityCounts(ctx, s.podInfo, allNodes)
+	tracer.Step("get incoming affinity antiaffinity count done")
 
 	cycleState.Write(preFilterStateKey, s)
 	return nil, nil
