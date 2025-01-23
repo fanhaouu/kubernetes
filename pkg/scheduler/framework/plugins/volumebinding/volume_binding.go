@@ -23,6 +23,8 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/klog/v2"
+
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -30,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-helpers/storage/ephemeral"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -95,6 +96,7 @@ func (pl *VolumeBinding) Name() string {
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
 func (pl *VolumeBinding) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+	fmt.Println("=========VolumeBinding==========EventsToRegister")
 	// Pods may fail to find available PVs because the node labels do not
 	// match the storage class's allowed topologies or PV's node affinity.
 	// A new or updated node may make pods schedulable.

@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/klog/v2"
+
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -31,7 +33,6 @@ import (
 	ephemeral "k8s.io/component-helpers/storage/ephemeral"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
@@ -83,6 +84,7 @@ func (pl *CSILimits) Name() string {
 // EventsToRegister returns the possible events that may make a Pod.
 // failed by this plugin schedulable.
 func (pl *CSILimits) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+	fmt.Println("=========NodeVolumeLimits==========EventsToRegister")
 	return []framework.ClusterEventWithHint{
 		// We don't register any `QueueingHintFn` intentionally
 		// because any new CSINode could make pods that were rejected by CSI volumes schedulable.
