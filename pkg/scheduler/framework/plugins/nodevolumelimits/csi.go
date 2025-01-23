@@ -84,7 +84,7 @@ func (pl *CSILimits) Name() string {
 // EventsToRegister returns the possible events that may make a Pod.
 // failed by this plugin schedulable.
 func (pl *CSILimits) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
-	fmt.Println("=========NodeVolumeLimits==========EventsToRegister")
+	klog.Info("=========NodeVolumeLimits==========EventsToRegister")
 	return []framework.ClusterEventWithHint{
 		// We don't register any `QueueingHintFn` intentionally
 		// because any new CSINode could make pods that were rejected by CSI volumes schedulable.

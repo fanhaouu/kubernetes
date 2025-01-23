@@ -96,7 +96,7 @@ func (pl *VolumeBinding) Name() string {
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
 func (pl *VolumeBinding) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
-	fmt.Println("=========VolumeBinding==========EventsToRegister")
+	klog.Info("=========VolumeBinding==========EventsToRegister")
 	// Pods may fail to find available PVs because the node labels do not
 	// match the storage class's allowed topologies or PV's node affinity.
 	// A new or updated node may make pods schedulable.
